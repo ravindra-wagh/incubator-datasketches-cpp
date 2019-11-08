@@ -143,6 +143,8 @@ public:
   // which does widening conversion to int64_t, if compatibility with Java is expected
   void update(const void* data, unsigned length);
 
+  void merge(const theta_sketch_alloc<A>& sketch);
+  
   compact_theta_sketch_alloc<A> compact(bool ordered = true) const;
 
   virtual typename theta_sketch_alloc<A>::const_iterator begin() const;
