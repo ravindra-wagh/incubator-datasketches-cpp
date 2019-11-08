@@ -463,7 +463,7 @@ update_theta_sketch_alloc<A> update_theta_sketch_alloc<A>::internal_deserialize(
   uint64_t* keys = AllocU64().allocate(1 << lg_cur_size);
   is.read((char*)keys, sizeof(uint64_t) * (1 << lg_cur_size));
   const bool is_empty = flags_byte & (1 << theta_sketch_alloc<A>::flags::IS_EMPTY);
-  return update_theta_sketch_alloc<A>(is_empty, theta, lg_nom_size, lg_cur_size, keys, num_keys, rf, p, seed);
+  return update_theta_sketch_alloc<A>(is_empty, theta, lg_cur_size, lg_nom_size, keys, num_keys, rf, p, seed);
 }
 
 template<typename A>
@@ -506,7 +506,7 @@ update_theta_sketch_alloc<A> update_theta_sketch_alloc<A>::internal_deserialize(
   uint64_t* keys = AllocU64().allocate(table_size);
   copy_from_mem(&ptr, keys, sizeof(uint64_t) * table_size);
   const bool is_empty = flags_byte & (1 << theta_sketch_alloc<A>::flags::IS_EMPTY);
-  return update_theta_sketch_alloc<A>(is_empty, theta, lg_nom_size, lg_cur_size, keys, num_keys, rf, p, seed);
+  return update_theta_sketch_alloc<A>(is_empty, theta, lg_cur_size, lg_nom_size, keys, num_keys, rf, p, seed);
 }
 
 template<typename A>
@@ -588,6 +588,22 @@ void update_theta_sketch_alloc<A>::update(const void* data, unsigned length) {
 template<typename A>
 compact_theta_sketch_alloc<A> update_theta_sketch_alloc<A>::compact(bool ordered) const {
   return compact_theta_sketch_alloc<A>(*this, ordered);
+}
+
+void update_theta_sketch_alloc<A>::merge(const theta_sketch_alloc<A>& other) {
+  if (other.is_empty()) return;
+  if (other.get_seed_hash() != this->get_seed_hash()) throw std::invalid_argument("seed hash mismatch");
+  this->is_empty_ = false;
+  if (other.get_theta64() < this->theta_) this->theta_ = other.get_theta64();
+  if (other.is_ordered()) {
+    for (auto hash: other) {
+      if (hash >= this->theta_) break; // early stop
+      internal_update(hash);
+    }
+  } else {
+    for (auto hash: other) if (hash < this->theta_) internal_update(hash);
+  }
+  if (this->get_theta64() < this->theta_) this->theta_ = this->get_theta64();
 }
 
 template<typename A>
