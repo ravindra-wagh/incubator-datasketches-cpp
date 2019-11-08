@@ -590,6 +590,22 @@ compact_theta_sketch_alloc<A> update_theta_sketch_alloc<A>::compact(bool ordered
   return compact_theta_sketch_alloc<A>(*this, ordered);
 }
 
+void update_theta_sketch_alloc<A>::merge(const theta_sketch_alloc<A>& other) {
+  if (other.is_empty()) return;
+  if (other.get_seed_hash() != this->get_seed_hash()) throw std::invalid_argument("seed hash mismatch");
+  this->is_empty_ = false;
+  if (other.get_theta64() < this->theta_) this->theta_ = other.get_theta64();
+  if (other.is_ordered()) {
+    for (auto hash: other) {
+      if (hash >= this->theta_) break; // early stop
+      internal_update(hash);
+    }
+  } else {
+    for (auto hash: other) if (hash < this->theta_) internal_update(hash);
+  }
+  if (this->get_theta64() < this->theta_) this->theta_ = this->get_theta64();
+}
+
 template<typename A>
 void update_theta_sketch_alloc<A>::internal_update(uint64_t hash) {
   this->is_empty_ = false;
